@@ -1,0 +1,207 @@
+#include <Servo.h>
+#include <RF24.h>
+
+int stationaryLED = 9;
+int automaticLED  = 6;
+int manualLED     = 5;
+int reverseLED    = 4;
+int tankLED       = 3;
+
+const int Xpin       = A0;
+int Xval;
+const int Ypin       = A1;
+int Yval;
+
+int tankState = 0;
+int driveButtonNew;
+int driveButtonOld = 1;// ********
+int driveButtonPin = 8;
+int driveModePin = 2;
+int driveModeState = 1;
+int driveModeOld = 1; 
+int driveModeNew;
+
+Servo LTalon;
+Servo RTalon;
+int LServoPin = 9;
+int RServoPin = 10;
+
+float motSpeedLeft;
+float motSpeedRight;
+
+void setup() 
+{
+
+  Serial.begin(9600);
+  pinMode(stationaryLED, OUTPUT);
+  pinMode(automaticLED, OUTPUT);
+  pinMode(manualLED, OUTPUT);
+  pinMode(reverseLED, OUTPUT);
+  pinMode(tankLED, OUTPUT);
+  
+  pinMode(Xpin, INPUT);
+  pinMode(Ypin, INPUT);
+  digitalWrite(driveButtonPin, HIGH);
+  digitalWrite(driveModePin, HIGH);
+
+  LTalon.attach(LServoPin);
+  RTalon.attach(RServoPin);
+}
+
+void loop() {
+
+  /**************************************
+  Gives value to drive mode variable(driveModeState) and turns on/off automaticLED and manualLED
+  ***************************************/
+    driveModeNew = digitalRead(driveModePin);
+      
+    if(driveModeOld == 0 && driveModeNew == 1)
+    {
+      if(driveModeState == 0)
+      {
+        digitalWrite(automaticLED, LOW);
+        digitalWrite(manualLED, HIGH);
+        driveModeState = 1;
+      }
+      else
+      {
+        digitalWrite(automaticLED, HIGH);
+        digitalWrite(manualLED, LOW);
+        driveModeState = 0;
+              
+      }
+            
+    }
+    driveModeOld = driveModeNew;
+    Serial.print(driveModeState);
+    Serial.print(driveModeOld);
+    Serial.println(driveModeNew);
+  
+  
+    
+  
+    if(driveModeState == 1)
+    {
+  
+  /**************************************
+  Gives value to tank drive variable(tankState) and turns on/off tankLED
+  ***************************************/
+      digitalWrite(manualLED, HIGH);
+      driveButtonNew = digitalRead(driveButtonPin);
+      
+      if(driveButtonOld == 0 && driveButtonNew == 1)
+        {
+          if(tankState == 0)
+            {
+              digitalWrite(tankLED, HIGH);
+                  tankState = 1;
+            }
+          else
+            {
+              digitalWrite(tankLED, LOW);
+              tankState = 0;
+              
+            }
+            
+        }
+      driveButtonOld = driveButtonNew;
+      
+  
+  /**************************************
+  Forward and reverse
+  ***************************************/
+      if(tankState == 0)
+      {
+        Xval = analogRead(Xpin);
+        Yval = analogRead(Ypin);
+         //********************************************
+        motSpeedLeft = (-512./500.)*Yval+2000;
+        motSpeedRight = (-512./500.)*Yval+2000;
+         //********************************************
+        LTalon.write(motSpeedLeft);
+        RTalon.write(motSpeedRight);
+      }
+  
+  
+  /**************************************
+  Tank drive
+  ***************************************/
+      if(tankState == 1)
+      {
+        Xval = analogRead(Xpin);
+        Yval = analogRead(Ypin);
+        //************************************************************
+        motSpeedLeft = (500.0/512.0)*Xval+1000;
+        motSpeedRight = -(512.0/500.0)*Xval+2000; 
+        //************************************************************
+        LTalon.write(motSpeedLeft);
+        RTalon.write(motSpeedRight);
+      }
+  
+  
+  /**************************************
+  turns on and off stationaryLED(red) telling user if there is movement or not (on = no movement, off = movement)
+  ***************************************/
+      if(motSpeedLeft > 1550 || motSpeedLeft < 1450)
+      {
+        digitalWrite(stationaryLED, LOW);
+      }
+      
+      if(motSpeedLeft < 1550 && motSpeedLeft > 1450)
+      {
+        digitalWrite(stationaryLED, HIGH);
+      }
+      
+      if(motSpeedRight > 1550 || motSpeedRight < 1450)
+      {
+        digitalWrite(stationaryLED, LOW);
+      }
+      
+      if(motSpeedRight < 1550 && motSpeedRight > 1450)
+      {
+        digitalWrite(stationaryLED, HIGH);
+      }
+      
+  
+  /**************************************
+  turns on and off reverseLED(white) telling user if in reverse or not (on = reverse, off = no reverse)
+  ***************************************/
+      if(motSpeedLeft > 1450 && motSpeedRight > 1450)
+      {
+        digitalWrite(reverseLED, LOW);
+      }
+      
+      if(motSpeedLeft < 1450 && motSpeedRight < 1450)
+      {
+        digitalWrite(reverseLED, HIGH);
+      }
+      
+        Serial.print("speed of motor on Left side = ");
+        Serial.print(motSpeedLeft);
+        Serial.print(" speed of motor on Right side = ");
+        Serial.print(motSpeedRight);
+        Serial.print(" tankState = ");
+        Serial.println(tankState);
+  
+    }
+  
+    else
+    {
+      if(Yval == 0)
+      {
+        digitalWrite(stationaryLED, LOW);
+        LTalon.write(1600);
+        RTalon.write(1600);
+        delay(1000);
+        LTalon.write(1600);
+        RTalon.write(1400);
+        delay(1000);
+        LTalon.write(1400);
+        RTalon.write(1600);
+        delay(1000);
+        LTalon.write(1400);
+        RTalon.write(1400);
+        digitalWrite(stationaryLED, HIGH);
+      }
+    }
+  
